@@ -3,7 +3,7 @@ import './index.css';
 import { navigateTo, context, requestExpandedMode } from '@devvit/web/client';
 import { StrictMode, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-
+import { GuessPost, GuessResponse } from '../shared/api';
 export const Splash = () => {
   // 1. State for score inputs
   const [homeScore, setHomeScore] = useState<string>('');
@@ -13,6 +13,17 @@ export const Splash = () => {
   // Replace this with your actual target match timestamp fetched from your server/context
   const [targetTime] = useState<number>(Date.parse("2026-06-11T16:00:00Z")); 
   const [timeLeft, setTimeLeft] = useState<number>(targetTime - Date.now());
+
+  useEffect(() => {
+    async function loadGuess() {
+      const response = await fetch("/api/guess");
+      const guess: GuessResponse = await response.json();
+      setHomeScore(String(guess.scoreHomeTeam));
+      setAwayScore(String(guess.scoreAwayTeam));
+    }
+    
+    loadGuess();
+  }, [])
 
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -52,7 +63,7 @@ export const Splash = () => {
   };
 
   // 4. Handle prediction submission
-  const handleSubmitPrediction = () => {
+  async function handleSubmitPrediction() {
     if (homeScore === '' || awayScore === '') {
       alert('Please enter a prediction for both teams!');
       return;
@@ -60,7 +71,20 @@ export const Splash = () => {
 
     // Since this runs in Devvit Webview, you'll eventually use window.parent.postMessage
     // to send this data back to your main Devvit backend.
-    console.log('Sending prediction to server:', { homeScore, awayScore });
+    const guess: GuessPost = {
+      type: 'guess_post',
+      scoreHomeTeam: Number(homeScore),
+      scoreAwayTeam: Number(awayScore),
+    }
+    await fetch('/api/guess', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        guess
+      }),
+    });
     alert(`Prediction submitted: Mexico ${homeScore} - ${awayScore} South Africa`);
   };
 

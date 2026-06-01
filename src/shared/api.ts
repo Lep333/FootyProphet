@@ -16,3 +16,17 @@ export type DecrementResponse = {
   postId: string;
   count: number;
 };
+
+export type GuessPost = {
+  type: 'guess_post';
+  scoreHomeTeam: number;
+  scoreAwayTeam: number;
+}
+
+export type GuessResponse = {
+  type: 'guess';
+  postId: string;
+  scoreHomeTeam: number;
+  scoreAwayTeam: number;
+  userPredicted: boolean;
+}

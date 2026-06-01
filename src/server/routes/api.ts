@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { context, redis, reddit } from '@devvit/web/server';
 import type {
   DecrementResponse,
+  GuessPost,
+  GuessResponse,
   IncrementResponse,
   InitResponse,
 } from '../../shared/api';
@@ -91,3 +93,58 @@ api.post('/decrement', async (c) => {
     type: 'decrement',
   });
 });
+
+api.get('/guess', async (c) => {
+  const { postId, userId } = context;
+  if (!postId) {
+    return c.json<ErrorResponse>(
+      {
+        status: 'error',
+        message: 'postId is required',
+      },
+      400
+    );
+  }
+  const userIdString = userId!;
+  const guess = await redis.hGet(postId, userIdString);
+  console.log(guess);
+  let userPredicted = true;
+  if (!guess) {
+    userPredicted = false;
+  }
+  const [scoreHomeTeam, scoreAwayTeam] = (guess ?? '0;0').split(';')
+  const scoreHomeTeamNumber = Number(scoreHomeTeam);
+  const scoreAwayTeamNumber = Number(scoreAwayTeam); 
+  return c.json<GuessResponse>({
+    postId,
+    scoreHomeTeam: scoreHomeTeamNumber,
+    scoreAwayTeam: scoreAwayTeamNumber,
+    userPredicted,
+    type: 'guess',
+  });
+})
+
+api.post('/guess', async (c) => {
+  const body = await c.req.json<{ guess: GuessPost }>();
+  
+  // Extract values out of the nested guess wrapper
+  const { scoreHomeTeam, scoreAwayTeam } = body.guess;
+  const { postId, userId } = context;
+  if (!postId) {
+    return c.json<ErrorResponse>(
+      {
+        status: 'error',
+        message: 'postId is required',
+      },
+      400
+    );
+  }
+  await redis.hSet(postId, {[userId!]: `${scoreHomeTeam};${scoreAwayTeam}`});
+  return c.json<GuessResponse>({
+    postId,
+    scoreHomeTeam: scoreHomeTeam,
+    scoreAwayTeam: scoreAwayTeam,
+    userPredicted: true,
+    type: 'guess',
+  });
+})
