@@ -8,6 +8,10 @@
         "inline": true,
         "entry": "splash.html"
       },
+      "tournament": {
+        "inline": true,
+        "entry": "tournament.html"
+      },
       "game": {
         "entry": "game.html"
       }
@@ -19,6 +23,13 @@
   },
   "menu": {
     "items": [
+      {
+        "label": "Create a new tournament",
+        "description": "Creates a new posting to set up a tournament",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/tournement-create"
+      },
       {
         "label": "Create a new post",
         "description": "footyprophet",

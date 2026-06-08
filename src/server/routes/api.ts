@@ -6,6 +6,10 @@ import type {
   GuessResponse,
   IncrementResponse,
   InitResponse,
+  MatchPut,
+  MatchResponse,
+  Participant,
+  ParticipantList,
 } from '../../shared/api';
 
 type ErrorResponse = {
@@ -94,6 +98,64 @@ api.post('/decrement', async (c) => {
   });
 });
 
+api.get('/match', async (c) => {
+  const { postId } = context;
+  if (!postId) {
+    return c.json<ErrorResponse>(
+      {
+        status: 'error',
+        message: 'postId is required',
+      },
+      400
+    );
+  }
+  const response = await redis.hGetAll(postId);
+  const matches: MatchResponse[] = Object.keys(response)
+    .filter((key) => key.startsWith("match:"))
+    .map((key) => JSON.parse(response[key]))
+  return c.json<MatchResponse[]>(matches);
+})
+
+api.post('/match', async (c) => {
+  const body: MatchPost = await c.req.json<{ match: MatchPost }>();
+  const uuid = crypto.randomUUID();
+  const newMatch: MatchResponse = {
+    ...body.match,
+    id: uuid,
+  }
+
+  const { postId } = context;
+  if (!postId) {
+    return c.json<ErrorResponse>(
+      {
+        status: 'error',
+        message: 'postId is required',
+      },
+      400
+    );
+  }
+  await redis.hSet(postId, {[`match:${uuid}`]: JSON.stringify(newMatch)});
+  return c.json<MatchResponse>(newMatch);
+})
+
+api.put('/match', async (c) => {
+  const body: MatchPut = await c.req.json<{ match: MatchPut }>();
+  
+  // Extract values out of the nested guess wrapper
+  const { postId, userId } = context;
+  if (!postId) {
+    return c.json<ErrorResponse>(
+      {
+        status: 'error',
+        message: 'postId is required',
+      },
+      400
+    );
+  }
+  await redis.hSet(postId, {[postId!]: `${body.tournamentName};${body.tournamentPhase};${body.scoreHome};${body.scoreAway};${body.teamHomeName};${body.teamAwayName};${body.flagHome};${body.flagAway};${body.startDate}`});
+  return c.json<MatchPut>(body);
+})
+
 api.get('/guess', async (c) => {
   const { postId, userId } = context;
   if (!postId) {
@@ -124,6 +186,7 @@ api.get('/guess', async (c) => {
   });
 })
 
+
 api.post('/guess', async (c) => {
   const body = await c.req.json<{ guess: GuessPost }>();
   
@@ -147,4 +210,62 @@ api.post('/guess', async (c) => {
     userPredicted: true,
     type: 'guess',
   });
+})
+
+api.get('/participant', async (c) => {
+  const { postId } = context;
+  if (!postId) {
+    return c.json<ErrorResponse>(
+      {
+        status: 'error',
+        message: 'postId is required',
+      },
+      400
+    );
+  }
+  let participants = (await redis.hGet(postId, "teams"))?.split(";");
+  if (!participants) {
+    return
+  }
+  const teams = Array<Participant>();
+  for (let participant of participants) {
+    const [name, flag] = participant.split("_");
+    const parti: Participant = {
+      type: "participant",
+      name: name ?? "Unknown Team",
+      flag_emoji: flag ?? "🌍",
+    }
+    teams.push(parti);
+  }
+  
+  return c.json<ParticipantList>({
+    participants: teams,
+  })
+})
+
+api.post('/participant', async (c) => {
+  const body = await c.req.json<{ participant: Participant }>();
+
+  const { postId } = context;
+  if (!postId) {
+    return c.json<ErrorResponse>(
+      {
+        status: 'error',
+        message: 'postId is required',
+      },
+      400
+    );
+  }
+  let participants = (await redis.hGet(postId, "teams"));
+  if (participants) {
+    participants = `${participants};${body.participant.name}_${body.participant.flag_emoji}`
+  } else {
+    participants = `${body.participant.name}_${body.participant.flag_emoji}`
+  }
+  await redis.hSet(postId, {"teams": participants});
+  return c.json<Participant>({
+    type: "participant",
+    name: body.participant.name,
+    flag_emoji: body.participant.flag_emoji,
+  })
 })

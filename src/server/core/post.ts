@@ -1,7 +1,8 @@
 import { reddit } from '@devvit/web/server';
 
-export const createPost = async () => {
+export const createPost = async (title: string, entrypoint: string = "default") => {
   return await reddit.submitCustomPost({
-    title: 'footyprophet',
+    title: title,
+    entry: entrypoint,
   });
 };
